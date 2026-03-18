@@ -5,3 +5,6 @@ __pycache__/
 output/
 .env
 .keep
+logs/
+*.log
+*.pkl
