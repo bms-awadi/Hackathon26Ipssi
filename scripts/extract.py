@@ -106,7 +106,7 @@ def extract_entities(text: str) -> dict:
     dates = list(dict.fromkeys(dates))
  
     #Numéro de facture
-    facture_matches = _FACTURA_NUM_RE = _FACTURE_NUM_RE.findall(text)
+    facture_matches = _FACTURE_NUM_RE.findall(text)
     numero_facture  = facture_matches[0] if facture_matches else ""
  
     #Montants

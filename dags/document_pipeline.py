@@ -55,11 +55,16 @@ def ocr_task(**context) -> str:
 
 def extract_task(**context) -> dict:
     from scripts.extract import extract_entities
-    text = context["ti"].xcom_pull(task_ids="run_ocr")
-    if not text:
-        raise ValueError("Aucun texte recu depuis run_ocr")
-    log.info("Extraction sur %d caracteres", len(text))
-    return extract_entities(text)
+    ocr_result = context["ti"].xcom_pull(task_ids="run_ocr")
+    if not ocr_result:
+        raise ValueError("Aucun résultat reçu depuis run_ocr")
+    text = ocr_result["text"] if isinstance(ocr_result, dict) else ocr_result
+    result = extract_entities(text)
+    # Faire transiter les métadonnées OCR vers validate et store
+    if isinstance(ocr_result, dict):
+        result["file_path"]        = ocr_result.get("file_path")
+        result["confidence_score"] = ocr_result.get("confidence_score")
+    return result
 
 
 def validate_task(**context) -> dict:

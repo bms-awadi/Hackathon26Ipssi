@@ -206,7 +206,8 @@ def run_ocr(file_info: dict) -> dict:
         result = _extract_txt(file_path)
     else:
         raise ValueError(f"Type non supporté : {file_type}")
- 
+    
+    result["file_path"] = file_path
     result["fields"] = {}   # sera rempli par extract_entities()
     log.info(
         "[ocr] Terminé — %d chars | confiance=%.2f | prétraitement=%s",
