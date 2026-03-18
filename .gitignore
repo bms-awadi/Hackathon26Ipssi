@@ -2,9 +2,7 @@ env/
 venv/
 __pycache__/
 *.pyc
-output/
 .env
 .keep
 logs/
 *.log
-*.pkl
