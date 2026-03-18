@@ -14,6 +14,7 @@ x-airflow-common: &airflow-common
     MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
     MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
     _PIP_ADDITIONAL_REQUIREMENTS: "minio pytesseract pillow pdf2image python-dotenv pdfplumber opencv-python-headless"
+    VALIDATION_URL: "http://validation:8001"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/scripts:/opt/airflow/scripts
@@ -133,6 +134,8 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+      validation:
+        condition: service_healthy
 
   airflow-scheduler:
     <<: *airflow-common
@@ -148,6 +151,27 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+      validation:
+        condition: service_healthy
+  
+  # ─────────────────────────────────────────────────────
+  # VALIDATION — Service Awadi
+  # ─────────────────────────────────────────────────────
+  validation:
+    build:
+      context: ../validation
+      dockerfile: Dockerfile
+    container_name: validation
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../datasets/output:/app/output
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      retries: 5
+      start_period: 15s
+    restart: always
 
 volumes:
   postgres-db-volume:
