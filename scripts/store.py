@@ -32,7 +32,7 @@ def store_curated(data: dict) -> None:
     iban     = _first(entities.get("ibans",  []))
     raison   = entities.get("raison_sociale", "")
  
-    # ── 1. Mise à jour fiche fournisseur ──────────────────────────────────────
+    # Mise à jour fiche fournisseur
     # Clé stable par SIRET : supplier_XXXXXXXXXXXXXXXXX.json
     if siret:
         supplier_key    = f"suppliers/supplier_{siret}.json"
@@ -43,7 +43,7 @@ def store_curated(data: dict) -> None:
     else:
         log.warning("[store] Pas de SIRET détecté — fiche fournisseur non créée.")
  
-    # ── 2. Log d'audit horodaté (pour Thomas) ─────────────────────────────────
+    # Log d'audit horodaté 
     timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     audit_key   = f"audit/audit_{timestamp}.json"
     audit_entry = {
@@ -60,8 +60,8 @@ def store_curated(data: dict) -> None:
     log.info("[store] Log d'audit écrit : %s", audit_key)
  
  
-# ─── Helpers ──────────────────────────────────────────────────────────────────
- 
+# Helpers
+
 def _first(lst: list):
     """Retourne le premier élément d'une liste, ou None."""
     return lst[0] if lst else None

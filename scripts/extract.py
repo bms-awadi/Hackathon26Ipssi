@@ -5,8 +5,7 @@ from typing import Optional
 log = logging.getLogger(__name__)
  
  
-# ─── Patterns regex ────────────────────────────────────────────────────────────
- 
+# Patterns regex
 _SIRET_RE         = re.compile(r'\b(\d{3}[\s.]?\d{3}[\s.]?\d{3}[\s.]?\d{5})\b')
 _IBAN_RE          = re.compile(r'\b([A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){3,7}[A-Z0-9]{1,4})\b')
 _DATE_FR_RE       = re.compile(r'\b(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\b')
@@ -90,30 +89,30 @@ def extract_entities(text: str) -> dict:
     if not text or not text.strip():
         raise ValueError("Texte vide — extraction impossible.")
  
-    # ── SIRET ──────────────────────────────────────────────────────────────────
+    #SIRET 
     raw_sirets = _SIRET_RE.findall(text)
     sirets     = list(dict.fromkeys(_clean_siret(s) for s in raw_sirets))  # déduplique
  
-    # ── IBAN ───────────────────────────────────────────────────────────────────
+    #IBAN
     raw_ibans = _IBAN_RE.findall(text)
     ibans     = list(dict.fromkeys(_clean_iban(i) for i in raw_ibans))
  
-    # ── Raison sociale ─────────────────────────────────────────────────────────
+    #Raison sociale
     raison_matches = _RAISON_RE.findall(text)
     raison_sociale = raison_matches[0].strip() if raison_matches else ""
  
-    # ── Dates ──────────────────────────────────────────────────────────────────
+    #Dates
     dates = _DATE_FR_RE.findall(text) + _DATE_LONG_RE.findall(text)
     dates = list(dict.fromkeys(dates))
  
-    # ── Numéro de facture ──────────────────────────────────────────────────────
+    #Numéro de facture
     facture_matches = _FACTURA_NUM_RE = _FACTURE_NUM_RE.findall(text)
     numero_facture  = facture_matches[0] if facture_matches else ""
  
-    # ── Montants ───────────────────────────────────────────────────────────────
+    #Montants
     montants = _extract_montants(text)
  
-    # ── Contacts ───────────────────────────────────────────────────────────────
+    # Contacts
     emails = list(dict.fromkeys(_EMAIL_RE.findall(text)))
     phones = list(dict.fromkeys(_PHONE_FR_RE.findall(text)))
  

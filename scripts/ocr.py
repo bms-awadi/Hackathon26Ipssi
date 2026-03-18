@@ -4,7 +4,7 @@ import os
 log = logging.getLogger(__name__)
  
  
-# ─── Prétraitement OpenCV ──────────────────────────────────────────────────────
+# Prétraitement OpenCV 
  
 def _preprocess_image(img):
     """
@@ -20,20 +20,20 @@ def _preprocess_image(img):
     import cv2
     import numpy as np
  
-    # 1. Conversion en niveaux de gris
+    # Conversion en niveaux de gris
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
  
-    # 2. Débruitage (conserve les bords texte)
+    # Débruitage (conserve les bords texte)
     denoised = cv2.fastNlMeansDenoising(gray, h=10, templateWindowSize=7, searchWindowSize=21)
  
-    # 3. Augmentation du contraste local (CLAHE)
+    # Augmentation du contraste local (CLAHE)
     clahe   = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     equalized = clahe.apply(denoised)
  
-    # 4. Binarisation adaptative Otsu
+    # Binarisation adaptative Otsu
     _, binary = cv2.threshold(equalized, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
  
-    # 5. Correction de l'inclinaison (deskew)
+    # Correction de l'inclinaison (deskew)
     binary = _deskew(binary)
  
     return binary
@@ -80,7 +80,7 @@ def _compute_confidence(data: dict) -> float:
     return round(sum(confs) / len(confs) / 100.0, 3)   # normalise 0-100 → 0.0-1.0
  
  
-# ─── Extraction PDF ────────────────────────────────────────────────────────────
+# Extraction PDF 
  
 def _extract_pdf(file_path: str) -> dict:
     """
@@ -133,7 +133,7 @@ def _ocr_page_as_image(page) -> dict:
     return {"text": text.strip(), "confidence_score": conf}
  
  
-# ─── Extraction image ──────────────────────────────────────────────────────────
+# Extraction image
  
 def _extract_image(file_path: str) -> dict:
     """OCR sur image avec prétraitement OpenCV."""
@@ -165,7 +165,7 @@ def _extract_image(file_path: str) -> dict:
     }
  
  
-# ─── Extraction texte brut ─────────────────────────────────────────────────────
+# Extraction texte brut 
  
 def _extract_txt(file_path: str) -> dict:
     """Lecture directe d'un fichier .txt — pas d'OCR nécessaire."""
@@ -178,8 +178,7 @@ def _extract_txt(file_path: str) -> dict:
     }
  
  
-# ─── Point d'entrée ────────────────────────────────────────────────────────────
- 
+# Point d'entrée
 def run_ocr(file_info: dict) -> dict:
     """
     Point d'entrée appelé par la tâche Airflow.
