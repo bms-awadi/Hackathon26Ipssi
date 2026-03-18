@@ -34,7 +34,7 @@ def get_latest_file(**context):
     )
 
     latest_file = os.path.join(DATA_DIR, files[0])
-    print(f"📄 Fichier détecté : {latest_file}")
+    print(f"Fichier détecté : {latest_file}")
 
     return latest_file
 
