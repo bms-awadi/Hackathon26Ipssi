@@ -5,15 +5,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BUCKET_RAW = "raw-documents"
-BUCKET_CLEAN = "clean-texts"
-BUCKET_CURATED = "curated-data"
+BUCKET_RAW = "raw"
+BUCKET_CLEAN = "clean"
+BUCKET_CURATED = "curated"
 
 def get_client() -> Minio:
     return Minio(
-        os.getenv("MINIO_ENDPOINT", "localhost:9000").replace("http://", ""),
-        access_key=os.getenv("MINIO_ROOT_USER", "minio_admin"),
-        secret_key=os.getenv("MINIO_ROOT_PASSWORD", "minio_password"),
+        os.getenv("MINIO_ENDPOINT", "localhost:9001").replace("http://", ""),
+        access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
+        secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
         secure=False,
     )
 
