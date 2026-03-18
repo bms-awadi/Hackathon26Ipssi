@@ -295,6 +295,36 @@ with DAG(
         python_callable=cleanup_task,
         trigger_rule=TriggerRule.ALL_DONE,  # S'exécute même si le pipeline échoue
     )
- 
-    t0 >> t1 >> t2 >> t3 >> t4 >> t5 >> t6 >> t7
-    t1 >> t7   # cleanup aussi si ingest échoue (fichier /tmp déjà créé)
+
+    t1 = PythonOperator(
+        task_id="ingest_document",
+        python_callable=ingest_task
+    )
+
+    t2 = PythonOperator(
+        task_id="run_ocr",
+        python_callable=ocr_task
+    )
+
+    t3 = PythonOperator(
+        task_id="extract_entities",
+        python_callable=extract_task
+    )
+
+    t4 = PythonOperator(
+        task_id="validate_document",
+        python_callable=validate_task
+    )
+
+    t5 = PythonOperator(
+        task_id="store_curated",
+        python_callable=store_task
+    )
+
+    t6 = PythonOperator(
+        task_id="notify_frontend",
+        python_callable=notify_task
+    )
+
+    # pipeline
+    t0 >> t1 >> t2 >> t3 >> t4 >> t5 >> t6
