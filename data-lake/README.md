@@ -1,6 +1,6 @@
 # Data Lake — MinIO
 
-Responsable : Clément  
+Responsable : Clément
 Stack : MinIO (compatible S3), Docker
 
 ---
