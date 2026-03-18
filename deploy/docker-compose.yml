@@ -161,7 +161,6 @@ services:
     build:
       context: ../validation
       dockerfile: Dockerfile
-    container_name: validation
     ports:
       - "8001:8001"
     volumes:
