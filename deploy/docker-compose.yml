@@ -15,9 +15,9 @@ x-airflow-common: &airflow-common
     MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
     _PIP_ADDITIONAL_REQUIREMENTS: "minio pytesseract pillow pdf2image python-dotenv pdfplumber opencv-python-headless"
   volumes:
-    - ../dags:/opt/airflow/dags
-    - ../scripts:/opt/airflow/scripts
-    - ../data:/opt/airflow/data
+    - ../airflow/dags:/opt/airflow/dags
+    - ../airflow/scripts:/opt/airflow/scripts
+    - ../airflow/data:/opt/airflow/data
     - ../data-lake:/opt/airflow/data_lake
     - airflow-logs:/opt/airflow/logs
     - airflow-plugins:/opt/airflow/plugins
@@ -98,9 +98,9 @@ services:
         AIRFLOW__CORE__FERNET_KEY: ''
         AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       volumes:
-        - ../dags:/opt/airflow/dags
-        - ../scripts:/opt/airflow/scripts
-        - ../data:/opt/airflow/data
+        - ../airflow/dags:/opt/airflow/dags
+        - ../airflow/scripts:/opt/airflow/scripts
+        - ../airflow/data:/opt/airflow/data
         - airflow-logs:/opt/airflow/logs
         - airflow-plugins:/opt/airflow/plugins
       entrypoint: /bin/bash
