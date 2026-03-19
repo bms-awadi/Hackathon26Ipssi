@@ -1,10 +1,7 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { documents } from '../data/mockData';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Header() {
-  const location = useLocation();
   const navigate = useNavigate();
-  const anomaliesCount = documents.filter((doc) => doc.anomaly !== 'Aucune').length;
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
   const userRole = localStorage.getItem('userRole');
 
@@ -77,15 +74,6 @@ export default function Header() {
 }
 
 const styles = {
-  navBadge: {
-    padding: '4px 12px',
-    backgroundColor: '#ef5350',
-    color: 'white',
-    borderRadius: '20px',
-    fontSize: '12px',
-    fontWeight: '600',
-    marginRight: '8px',
-  },
   profileSection: {
     display: 'flex',
     alignItems: 'center',

@@ -48,8 +48,6 @@ export default function SupplierDetailPage() {
           <p><strong>Statut global :</strong> <span style={globalStatus === 'Conforme' ? styles.statusGood : styles.statusBad}>{globalStatus}</span></p>
         </div>
 
-        <SupplierForm supplier={supplier} />
-
         <div style={styles.documentsSection}>
           <h3>Documents du dossier</h3>
 
