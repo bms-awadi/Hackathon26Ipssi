@@ -12,7 +12,7 @@ from features import extract_features, COLUMNS
 
 warnings.filterwarnings("ignore")
 
-LABELS_PATH = os.path.join(os.path.dirname(__file__), "..", "output", "labels.json")
+LABELS_PATH = os.path.join("datasets", "output", "labels.json")
 SCALER_PATH = os.path.join(os.path.dirname(__file__), "scaler.pkl")
 BEST_MODEL_PATH = os.path.join(os.path.dirname(__file__), "best_model.pkl")
 
