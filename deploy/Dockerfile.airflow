@@ -2,9 +2,6 @@ FROM apache/airflow:2.7.3
 
 USER root
 
-# System deps for OCR pipeline:
-# - tesseract-ocr (+ French language data)
-# - poppler-utils for pdf2image (pdftoppm)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-fra \
@@ -13,10 +10,3 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 USER airflow
-
-# NOTE:
-# The base apache/airflow image here is Python 3.8 and doesn't include a compiler toolchain.
-# Installing spaCy/easyocr from source can fail (needs g++).
-# We'll install them via Airflow's runtime pip mechanism (_PIP_ADDITIONAL_REQUIREMENTS)
-# where you can pin compatible wheels if needed.
-

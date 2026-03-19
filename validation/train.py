@@ -18,6 +18,10 @@ BEST_MODEL_PATH = os.path.join(os.path.dirname(__file__), "best_model.pkl")
 
 
 def load_dataset():
+    if not os.path.exists(LABELS_PATH):
+        print(f"labels.json introuvable : {LABELS_PATH} — dataset vide")
+        return [], []
+    
     with open(LABELS_PATH, encoding="utf-8") as f:
         labels = json.load(f)
 
@@ -35,6 +39,10 @@ def load_dataset():
 
 def train():
     X, y = load_dataset()
+    
+    if not X:
+        print("Dataset vide — entraînement ignoré")
+        return
 
     print(f"Total factures PDF : {len(y)}")
     print(f"Legitimes          : {sum(y)}")

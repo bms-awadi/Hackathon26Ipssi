@@ -16,8 +16,8 @@ export const config = {
     useSSL: (process.env.MINIO_USE_SSL || "false").toLowerCase() === "true",
     accessKey: process.env.MINIO_ACCESS_KEY || "minioadmin",
     secretKey: process.env.MINIO_SECRET_KEY || "minioadmin",
-    bucketRaw: process.env.MINIO_BUCKET_RAW || "raw-documents",
-    bucketClean: process.env.MINIO_BUCKET_CLEAN_TEXTS || "clean-texts",
+    bucketRaw: process.env.MINIO_BUCKET_RAW || "raw",
+    bucketClean: process.env.MINIO_BUCKET_CLEAN_TEXTS || "clean",
     bucketCurated: process.env.MINIO_BUCKET_CURATED || "curated"
   }
 };

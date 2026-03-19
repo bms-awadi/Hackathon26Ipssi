@@ -1,8 +1,6 @@
 x-airflow-common: &airflow-common
   image: hackathon26-airflow:2.7.3-ocr
-  build:
-    context: ..
-    dockerfile: deploy/Dockerfile.airflow
+  pull_policy: never
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -10,23 +8,23 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
-    PYTHONPATH: "/opt/airflow:/opt/airflow/ocr_extraction"
+    PYTHONPATH: "/opt/airflow:/opt/airflow/ocr/extraction"
     AIRFLOW__CORE__DAG_FILE_PROCESSOR_TIMEOUT: 120
     AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 10
     MINIO_ENDPOINT: "${MINIO_ENDPOINT:-http://minio:9000}"
     MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
     MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
-    # Align buckets with the cahier (Awadi/Ryma)
-    MINIO_BUCKET_RAW: "${MINIO_BUCKET_RAW:-raw-documents}"
-    MINIO_BUCKET_CLEAN_TEXTS: "${MINIO_BUCKET_CLEAN_TEXTS:-clean-texts}"
+    MINIO_BUCKET_RAW: "${MINIO_BUCKET_RAW:-raw}"
+    MINIO_BUCKET_CLEAN_TEXTS: "${MINIO_BUCKET_CLEAN_TEXTS:-clean}"
     MINIO_BUCKET_CURATED: "${MINIO_BUCKET_CURATED:-curated}"
     _PIP_ADDITIONAL_REQUIREMENTS: "minio pytesseract pillow pdf2image python-dotenv pdfplumber opencv-python-headless spacy easyocr fr-core-news-lg"
+    VALIDATION_URL: "http://validation:8001"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/scripts:/opt/airflow/scripts
     - ../airflow/data:/opt/airflow/data
     - ../data-lake:/opt/airflow/data_lake
-    - ../ocr_extraction:/opt/airflow/ocr_extraction
+    - ../ocr/extraction:/opt/airflow/ocr/extraction
     - airflow-logs:/opt/airflow/logs
     - airflow-plugins:/opt/airflow/plugins
   user: "${AIRFLOW_UID:-50000}:0"
@@ -109,6 +107,9 @@ services:
   # ─────────────────────────────────────────────────────
   airflow-init:
       image: hackathon26-airflow:2.7.3-ocr
+      build:
+        context: ..
+        dockerfile: deploy/Dockerfile.airflow
       depends_on:
         postgres:
           condition: service_healthy
@@ -120,17 +121,17 @@ services:
         MINIO_ENDPOINT: "${MINIO_ENDPOINT:-http://minio:9000}"
         MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
         MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
-        MINIO_BUCKET_RAW: "${MINIO_BUCKET_RAW:-raw-documents}"
-        MINIO_BUCKET_CLEAN_TEXTS: "${MINIO_BUCKET_CLEAN_TEXTS:-clean-texts}"
+        MINIO_BUCKET_RAW: "${MINIO_BUCKET_RAW:-raw}"
+        MINIO_BUCKET_CLEAN_TEXTS: "${MINIO_BUCKET_CLEAN_TEXTS:-clean}"
         MINIO_BUCKET_CURATED: "${MINIO_BUCKET_CURATED:-curated}"
-        PYTHONPATH: "/opt/airflow:/opt/airflow/ocr_extraction"
+        PYTHONPATH: "/opt/airflow:/opt/airflow/ocr/extraction"
       volumes:
         - ../airflow/dags:/opt/airflow/dags
         - ../airflow/scripts:/opt/airflow/scripts
         - ../airflow/data:/opt/airflow/data
         - airflow-logs:/opt/airflow/logs
         - airflow-plugins:/opt/airflow/plugins
-        - ../ocr_extraction:/opt/airflow/ocr_extraction
+        - ../ocr/extraction:/opt/airflow/ocr/extraction
       entrypoint: /bin/bash
       command:
         - -c
@@ -161,6 +162,8 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+      validation:
+        condition: service_healthy
 
   airflow-scheduler:
     <<: *airflow-common
@@ -176,15 +179,35 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+      validation:
+        condition: service_healthy
+  
+  # ─────────────────────────────────────────────────────
+  # VALIDATION — (Responsable : Awadi)
+  # ─────────────────────────────────────────────────────
+  validation:
+    build:
+      context: ../validation
+      dockerfile: ../deploy/Dockerfile.validation
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../datasets/output:/app/output
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      retries: 5
+      start_period: 15s
+    restart: always
 
   # ─────────────────────────────────────────
-  # BACKEND API — Node.js + MongoDB + MinIO
+  # BACKEND API — Node.js + MongoDB + MinIO (Responsable : Soufiane)
   # ─────────────────────────────────────────
-  backend:
+  back:
     image: hackathon26-backend:0.1
     build:
-      context: ../backend
-      dockerfile: Dockerfile
+      context: ../back
+      dockerfile: ../deploy/Dockerfile.back
     environment:
       PORT: 3001
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:5173}"
@@ -195,8 +218,8 @@ services:
       MINIO_USE_SSL: "false"
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
       MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
-      MINIO_BUCKET_RAW: "${MINIO_BUCKET_RAW:-raw-documents}"
-      MINIO_BUCKET_CLEAN_TEXTS: "${MINIO_BUCKET_CLEAN_TEXTS:-clean-texts}"
+      MINIO_BUCKET_RAW: "${MINIO_BUCKET_RAW:-raw}"
+      MINIO_BUCKET_CLEAN_TEXTS: "${MINIO_BUCKET_CLEAN_TEXTS:-clean}"
       MINIO_BUCKET_CURATED: "${MINIO_BUCKET_CURATED:-curated}"
     ports:
       - "3001:3001"
@@ -205,6 +228,22 @@ services:
         condition: service_started
       minio:
         condition: service_healthy
+    restart: always
+  
+  # ─────────────────────────────────────────
+  # FRONTEND — React / Vite (Responsable : Ryma)
+  # ─────────────────────────────────────────
+  front:
+    build:
+      context: ../front
+      dockerfile: ../deploy/Dockerfile.front
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: "http://localhost:3001"
+    depends_on:
+      back:
+        condition: service_started
     restart: always
 
 volumes:
