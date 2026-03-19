@@ -44,6 +44,36 @@ def ingest_task(**context) -> dict:
     return ingest_document(file_path)
 
 
+def upload_raw_task(**context) -> dict:
+    from scripts.minio_raw import upload_raw
+
+    file_info = context["ti"].xcom_pull(task_ids="ingest_document")
+    if not file_info:
+        raise ValueError("Aucune info recue depuis ingest_document")
+
+    file_path = file_info.get("path")
+    if not file_path:
+        raise ValueError("ingest_document n'a pas fourni de path")
+
+    # document_id stable pour une clé MinIO stable
+    document_id = os.path.splitext(os.path.basename(file_path))[0]
+    return upload_raw(local_path=file_path, document_id=document_id)
+
+
+def minio_raw_to_clean_task(**context) -> dict:
+    from scripts.minio_clean import raw_to_clean
+
+    uploaded = context["ti"].xcom_pull(task_ids="upload_raw_to_minio")
+    if not uploaded:
+        raise ValueError("Aucune info recue depuis upload_raw_to_minio")
+
+    return raw_to_clean(
+        document_id=uploaded["document_id"],
+        raw_object_key=uploaded["object_key"],
+        document_type="facture_fournisseur",
+    )
+
+
 def ocr_task(**context) -> str:
     from scripts.ocr import run_ocr
     file_info = context["ti"].xcom_pull(task_ids="ingest_document")
@@ -108,10 +138,16 @@ with DAG(
 
     t0 = PythonOperator(task_id="get_file",          python_callable=get_latest_file)
     t1 = PythonOperator(task_id="ingest_document",   python_callable=ingest_task)
+    t1b = PythonOperator(task_id="upload_raw_to_minio", python_callable=upload_raw_task)
+    t1c = PythonOperator(task_id="raw_to_clean_texts",  python_callable=minio_raw_to_clean_task)
     t2 = PythonOperator(task_id="run_ocr",           python_callable=ocr_task)
     t3 = PythonOperator(task_id="extract_entities",  python_callable=extract_task)
     t4 = PythonOperator(task_id="validate_document", python_callable=validate_task)
     t5 = PythonOperator(task_id="store_curated",     python_callable=store_task)
     t6 = PythonOperator(task_id="notify_frontend",   python_callable=notify_task)
 
+    # Nouveau flux : stockage zone "clean-texts" (JSON contractuel) dans MinIO Clean
+    t0 >> t1 >> t1b >> t1c
+
+    # Flux existant (local) conservé pour curated/validation
     t0 >> t1 >> t2 >> t3 >> t4 >> t5 >> t6
