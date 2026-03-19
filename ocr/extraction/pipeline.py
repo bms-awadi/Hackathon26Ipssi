@@ -4,10 +4,7 @@ from typing import Optional, Dict, Any
 
 from .contract import Contract, compute_contract_confidence
 from .entity_extraction import extract_entities_spacy_regex
-from .minio_storage import (
-    download_from_minio,
-    put_json_to_minio,
-)
+from .minio_storage import download_from_minio, put_json_to_minio
 from .ocr_multi import ocr_image_multi
 
 
@@ -19,6 +16,7 @@ def _env(name: str, default: str) -> str:
 MINIO_BUCKET_RAW = _env("MINIO_BUCKET_RAW", "raw")
 MINIO_BUCKET_CLEAN_TEXTS = _env("MINIO_BUCKET_CLEAN_TEXTS", "clean")
 
+POPPLER_PATH = _env("POPPLER_PATH", r"C:\poppler\poppler-24.08.0\Library\bin")
 
 SUPPORTED_LOCAL_EXTS = {
     ".pdf",
@@ -41,20 +39,38 @@ def _read_txt(path: str) -> str:
 
 def _pdf_to_first_page_image(pdf_path: str) -> str:
     """
-    Conversion PDF -> image pour OCR.
-    Note : pour rester simple, on OCR la 1ere page pour l'extraction.
-    Ajustable si vous voulez OCR toutes les pages (plus lent).
+    Conversion PDF -> image PNG propre pour OCR.
+    Utilise pdf2image avec poppler.
+    Pas de binarisation pour les PDFs vectoriels.
     """
     from pdf2image import convert_from_path
+    import tempfile
+    import numpy as np
+    import cv2
+    from PIL import Image as PILImage
 
-    pages = convert_from_path(pdf_path, dpi=200)
+    pages = convert_from_path(pdf_path, dpi=300, poppler_path=POPPLER_PATH)
     if not pages:
         raise ValueError(f"PDF sans page : {pdf_path}")
-    pil = pages[0]
-    # Sauvegarde image temporaire.
-    import tempfile
+
+    img = np.array(pages[0])
+
+    # Detection et correction de rotation via Tesseract OSD
+    try:
+        import pytesseract
+
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        osd = pytesseract.image_to_osd(gray, output_type=pytesseract.Output.DICT)
+        angle = osd.get("rotate", 0)
+        if angle != 0:
+            pil = PILImage.fromarray(img)
+            pil = pil.rotate(-angle, expand=True)
+            img = np.array(pil)
+    except Exception:
+        pass
+
     out = tempfile.mktemp(prefix="pdf_page_", suffix=".png")
-    pil.save(out, "PNG")
+    PILImage.fromarray(img).save(out, "PNG")
     return out
 
 
@@ -180,4 +196,3 @@ def extract_from_minio_to_clean(
             bucket=MINIO_BUCKET_CLEAN_TEXTS,
         )
     return contract_out
-
