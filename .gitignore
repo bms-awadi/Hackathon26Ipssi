@@ -7,8 +7,6 @@ __pycache__/
 logs/
 *.log
 output_last/
-output/
-datasets/output/*
 companies.json
 generate_apikey.ipynb
 generate_dataset.py
@@ -16,5 +14,3 @@ ocr/
 preprocess/
 last_best_model.pkl
 last_scaler.pkl
-test/
-labels.json
