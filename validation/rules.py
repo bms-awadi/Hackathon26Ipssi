@@ -31,7 +31,7 @@ def check_luhn_siret(siret):
     total = 0
     for i, digit in enumerate(siret):
         n = int(digit)
-        if i % 2 == 1:
+        if i % 2 == 0:
             n *= 2
             if n > 9:
                 n -= 9
@@ -71,6 +71,18 @@ def check_tva(tva, siren):
     return None
 
 
+# Verification de la date d'expiration de l'attestation
+def check_attestation_expired(date_expiration):
+    if not date_expiration:
+        return None
+    if isinstance(date_expiration, str):
+        date_expiration = date_expiration.split("T")[0]
+        date_expiration = date.fromisoformat(date_expiration)
+    if date_expiration < date.today():
+        return f"Attestation expiree le {date_expiration.isoformat()}"
+    return None
+
+
 # verification de la correspondance du SIRET entre la facture et l'attestation liee
 def check_siret_mismatch(fichier, siret_facture):
     labels = load_labels()
@@ -105,15 +117,4 @@ def check_doublon(fichier, vendeur, total_ttc):
             continue
         if abs(doc["total_ttc"] - total_ttc) < TOLERANCE_ARITHMETIQUE:
             return f"Doublon detecte avec {nom} : meme vendeur {vendeur} et meme montant TTC {total_ttc}"
-    return None
-
-
-# verification de l'expiration de l'attestation liee
-def check_attestation_expired(date_expiration):
-    if not date_expiration:
-        return None
-    if isinstance(date_expiration, str):
-        date_expiration = date.fromisoformat(date_expiration)
-    if date_expiration < date.today():
-        return f"Attestation expiree le {date_expiration.isoformat()}"
     return None
