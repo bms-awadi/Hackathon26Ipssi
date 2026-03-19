@@ -1,5 +1,4 @@
 import { Link, useParams } from 'react-router-dom';
-import SupplierForm from '../components/SupplierForm';
 import { suppliers } from '../data/mockData';
 
 export default function SupplierDetailPage() {
