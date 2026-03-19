@@ -3,7 +3,9 @@ import os
 from datetime import date
 from config import TOLERANCE_ARITHMETIQUE
 
-LABELS_PATH = os.path.join(os.path.dirname(__file__), "..", "output", "labels.json")
+LABELS_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "datasets", "output", "labels.json"
+)
 
 
 def load_labels():

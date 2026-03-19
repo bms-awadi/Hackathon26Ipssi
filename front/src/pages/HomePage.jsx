@@ -12,14 +12,8 @@ export default function HomePage() {
     ).toFixed(2);
 
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-  const userRole = localStorage.getItem('userRole');
 
-  const getDashboardPath = () => {
-    if (userRole === 'operator') return '/operator';
-    if (userRole === 'crm') return '/crm';
-    if (userRole === 'compliance') return '/compliance';
-    return '/';
-  };
+  
 
   return (
     <div className="page-center">

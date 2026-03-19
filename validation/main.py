@@ -88,9 +88,10 @@ def validate(doc: DocumentData):
             ),
         }
     )
-    ml_score = predict(features)
-    if ml_score > 0:
-        add("ML_ANOMALY", "MEDIUM", f"Score d'anomalie AdaBoost : {ml_score}/40")
+    if doc.doc_type == "facture":
+        ml_score = predict(features)
+        if ml_score > 0:
+            add("ML_ANOMALY", "MEDIUM", f"Score d'anomalie AdaBoost : {ml_score}/40")
 
     return build_result(doc.doc_id, anomalies)
 

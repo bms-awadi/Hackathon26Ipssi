@@ -1,5 +1,4 @@
 import { Link, useParams } from 'react-router-dom';
-import SupplierForm from '../components/SupplierForm';
 import { suppliers } from '../data/mockData';
 
 export default function SupplierDetailPage() {
@@ -47,8 +46,6 @@ export default function SupplierDetailPage() {
           <p><strong>Contact :</strong> {supplier.contact}</p>
           <p><strong>Statut global :</strong> <span style={globalStatus === 'Conforme' ? styles.statusGood : styles.statusBad}>{globalStatus}</span></p>
         </div>
-
-        <SupplierForm supplier={supplier} />
 
         <div style={styles.documentsSection}>
           <h3>Documents du dossier</h3>

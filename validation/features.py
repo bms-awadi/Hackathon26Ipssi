@@ -1,4 +1,13 @@
-COLUMNS = ["feature_0", "feature_1", "feature_2", "feature_3", "feature_4", "feature_5"]
+COLUMNS = [
+    "feature_0",
+    "feature_1",
+    "feature_2",
+    "feature_3",
+    "feature_4",
+    "feature_5",
+    "feature_6",
+    "feature_7",
+]
 
 
 def extract_features(doc):
@@ -8,4 +17,15 @@ def extract_features(doc):
     taux_tva = doc.get("taux_tva", 0) or 0
     ratio_tva = round(tva / total_ht, 4) if total_ht else 0
     ratio_ttc = round(total_ttc / total_ht, 4) if total_ht else 0
-    return [total_ht, tva, total_ttc, taux_tva, ratio_tva, ratio_ttc]
+    taux_normal = 1 if abs(taux_tva - 0.20) < 0.01 else 0
+    ecart_tva = round(abs(taux_tva - 0.20), 4)
+    return [
+        total_ht,
+        tva,
+        total_ttc,
+        taux_tva,
+        ratio_tva,
+        ratio_ttc,
+        taux_normal,
+        ecart_tva,
+    ]
