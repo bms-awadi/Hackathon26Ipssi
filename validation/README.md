@@ -37,7 +37,7 @@ Swagger disponible sur : http://localhost:8001/docs
 ## Structure des fichiers
 
 ```
-validation-service/
+validation/
 ├── main.py          Point d'entrée FastAPI — orchestre tous les appels
 ├── rules.py         7 règles de validation (format, calcul, croisement)
 ├── scorer.py        Calcul du score de risque et du statut final
