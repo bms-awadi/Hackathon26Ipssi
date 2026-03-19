@@ -10,8 +10,8 @@ import requests
 
 sys.path.insert(0, os.path.abspath("."))
 
-from ocr_extraction.pipeline import extract_from_local_file
-from ocr_extraction.adapter import to_validation_payload
+from ocr.extraction.pipeline import extract_from_local_file
+from ocr.extraction.adapter import to_validation_payload
 
 VALIDATION_URL = "http://localhost:8001/validate"
 
