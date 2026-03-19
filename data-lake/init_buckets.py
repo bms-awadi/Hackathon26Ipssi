@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BUCKETS = [
-    "raw-documents",
-    "clean-texts",
-    "curated-data",
+    "raw",
+    "clean",
+    "curated",
 ]
 
 def init_buckets():

@@ -76,6 +76,27 @@ documentsRouter.post(
         status: doc.status,
         rawObjectKey: doc.rawObjectKey
       });
+
+      try {
+        const response = await fetch("http://airflow-webserver:8080/api/v1/dags/document_pipeline/dagRuns", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Basic " + Buffer.from("airflow:airflow").toString("base64"),
+          },
+          body: JSON.stringify({ conf: { document_id: documentId } }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Refus d'Airflow (Statut ${response.status}) :`, errorText);
+        } else {
+          console.log(`Pipeline Airflow déclenchée avec succès pour : ${documentId}`);
+        }
+        
+      } catch (e) {
+        console.error("Crash réseau en contactant Airflow :", e.message);
+      }
     }
 
     return res.json({ documents: created });

@@ -9,7 +9,7 @@ def _env(name: str, default: str) -> str:
     return v if v is not None and v != "" else default
 
 
-MINIO_BUCKET_RAW = _env("MINIO_BUCKET_RAW", "raw-documents")
+MINIO_BUCKET_RAW = _env("MINIO_BUCKET_RAW", "raw")
 
 
 def raw_to_clean(document_id: str, raw_object_key: str, document_type: str = "facture_fournisseur") -> dict:

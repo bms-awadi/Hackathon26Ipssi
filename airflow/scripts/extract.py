@@ -13,11 +13,12 @@ _DATE_LONG_RE     = re.compile(
     r'\b(\d{1,2}\s+(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|'
     r'octobre|novembre|décembre)\s+\d{4})\b', re.IGNORECASE
 )
-_MONTANT_RE       = re.compile(r'\b(\d{1,6}(?:[.,]\d{2,3})?)\s*(?:€|EUR|euros?)\b', re.IGNORECASE)
+_MONTANT_RE = re.compile(r'\b(\d{1,6}(?:[.,]\d{2,3})?)\s*(?:€|EUR|euros?)(?!\w)', re.IGNORECASE)
 _PHONE_FR_RE      = re.compile(r'\b((?:0|\+33)[1-9](?:[\s.\-]?\d{2}){4})\b')
 _EMAIL_RE         = re.compile(r'\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b')
-_FACTURE_NUM_RE   = re.compile(
-    r'(?:facture|fact|invoice|n°|num[eé]ro)[^\w]*([A-Z0-9\-/]{3,20})', re.IGNORECASE
+_FACTURE_NUM_RE = re.compile(
+    r'\b(?:fac|inv|num|n).*?([A-Z]{1,4}[-_\s]?\d{2,4}[-_\s]?\d{3,8})\b', 
+    re.IGNORECASE
 )
 _RAISON_RE        = re.compile(
     r'(?:SARL|SAS|SA|SASU|EURL|SNC|GIE|EI|AUTO[\-\s]?ENTREPRENEUR)[^\n]{0,60}', re.IGNORECASE

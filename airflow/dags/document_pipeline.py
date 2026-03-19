@@ -12,36 +12,55 @@ log = logging.getLogger(__name__)
 DATA_DIR = "/opt/airflow/data/raw"
 
 
-def get_latest_file(**context) -> str:
-    if not os.path.exists(DATA_DIR):
-        raise FileNotFoundError(f"Dossier introuvable : {DATA_DIR}")
+def get_latest_file(**context) -> dict:
+    from minio import Minio
+    import os
 
-    files = [
-        f for f in os.listdir(DATA_DIR)
-        if os.path.isfile(os.path.join(DATA_DIR, f)) and not f.startswith(".")
-    ]
+    conf = context.get("dag_run").conf or {}
+    document_id = conf.get("document_id")
 
-    if not files:
-        raise ValueError(f"Aucun fichier dans {DATA_DIR}")
-
-    files_sorted = sorted(
-        files,
-        key=lambda x: os.path.getmtime(os.path.join(DATA_DIR, x)),
-        reverse=True,
+    endpoint = os.environ.get("MINIO_ENDPOINT", "http://minio:9000").replace("http://", "")
+    client = Minio(
+        endpoint,
+        access_key=os.environ.get("MINIO_ACCESS_KEY", "minioadmin"),
+        secret_key=os.environ.get("MINIO_SECRET_KEY", "minioadmin"),
+        secure=False,
     )
 
-    latest = os.path.join(DATA_DIR, files_sorted[0])
-    log.info("Fichier detecte : %s", latest)
-    return latest
+    bucket = os.environ.get("MINIO_BUCKET_RAW", "raw")
+    if document_id:
+        objects = list(client.list_objects(bucket, prefix=document_id))
+        if not objects:
+            raise ValueError(f"Aucun fichier trouvé pour document_id={document_id}")
+        object_key = objects[0].object_name
+    else:
+        objects = list(client.list_objects(bucket, recursive=True))
+        if not objects:
+            raise ValueError(f"Aucun fichier dans MinIO bucket {bucket}")
+        object_key = sorted(objects, key=lambda o: o.last_modified, reverse=True)[0].object_name
+        document_id = object_key.split(".")[0]
+
+    _, ext = os.path.splitext(object_key)
+    local_path = f"/tmp/{document_id}{ext}"
+    client.fget_object(bucket, object_key, local_path)
+    log.info("Fichier récupéré depuis MinIO : %s -> %s", object_key, local_path)
+
+    return {
+        "local_path": local_path,
+        "object_key": object_key,
+        "document_id": document_id,
+    }
 
 
-def ingest_task(**context) -> dict:
+def ingest_task(**context):
     from scripts.ingest import ingest_document
-    file_path = context["ti"].xcom_pull(task_ids="get_file")
-    if not file_path:
-        raise ValueError("Aucun fichier recu depuis get_file")
-    log.info("Ingestion : %s", file_path)
-    return ingest_document(file_path)
+    file_info = context["ti"].xcom_pull(task_ids="get_file")
+    if not file_info:
+        raise ValueError("Aucune info reçue depuis get_file")
+    path = file_info.get("local_path") or file_info
+    result = ingest_document(path if isinstance(path, str) else path)
+    result["document_id"] = file_info.get("document_id", "")
+    return result
 
 
 def upload_raw_task(**context) -> dict:
@@ -113,9 +132,25 @@ def store_task(**context) -> None:
     store_curated(data)
 
 
-def notify_task(**context) -> None:
+def notify_task(**context):
     from scripts.notify import notify_frontend
-    notify_frontend()
+
+    validated = context["ti"].xcom_pull(task_ids="validate_document")
+    document_id = ""
+    
+    if validated and isinstance(validated, dict):
+        source = validated.get("source_file", "") or ""
+        document_id = source.split("/")[-1].split(".")[0] if source else ""
+
+    if not document_id:
+        get_file_result = context["ti"].xcom_pull(task_ids="get_file")
+        if isinstance(get_file_result, dict):
+            document_id = get_file_result.get("document_id", "")
+        else:
+            import os
+            document_id = os.path.splitext(os.path.basename(str(get_file_result or "")))[0]
+
+    notify_frontend(validated_data=validated, document_id=document_id)
 
 
 default_args = {
@@ -138,16 +173,16 @@ with DAG(
 
     t0 = PythonOperator(task_id="get_file",          python_callable=get_latest_file)
     t1 = PythonOperator(task_id="ingest_document",   python_callable=ingest_task)
-    t1b = PythonOperator(task_id="upload_raw_to_minio", python_callable=upload_raw_task)
-    t1c = PythonOperator(task_id="raw_to_clean_texts",  python_callable=minio_raw_to_clean_task)
+    # t1b = PythonOperator(task_id="upload_raw_to_minio", python_callable=upload_raw_task)
+    # t1c = PythonOperator(task_id="raw_to_clean_texts",  python_callable=minio_raw_to_clean_task)
     t2 = PythonOperator(task_id="run_ocr",           python_callable=ocr_task)
     t3 = PythonOperator(task_id="extract_entities",  python_callable=extract_task)
     t4 = PythonOperator(task_id="validate_document", python_callable=validate_task)
     t5 = PythonOperator(task_id="store_curated",     python_callable=store_task)
     t6 = PythonOperator(task_id="notify_frontend",   python_callable=notify_task)
 
-    # Nouveau flux : stockage zone "clean-texts" (JSON contractuel) dans MinIO Clean
-    t0 >> t1 >> t1b >> t1c
+    # Nouveau flux : stockage zone "clean" (JSON contractuel) dans MinIO Clean
+    # t0 >> t1 >> t1b >> t1c
 
     # Flux existant (local) conservé pour curated/validation
     t0 >> t1 >> t2 >> t3 >> t4 >> t5 >> t6

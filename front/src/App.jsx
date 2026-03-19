@@ -40,7 +40,7 @@ function App() {
         <Route
           path="/crm"
           element={
-            <ProtectedRoute allowedRole="crm">
+            <ProtectedRoute allowedRole="supplier">
               <CRMPage />
             </ProtectedRoute>
           }
@@ -49,7 +49,7 @@ function App() {
         <Route
           path="/crm/:supplierId"
           element={
-            <ProtectedRoute allowedRole="crm">
+            <ProtectedRoute allowedRole="supplier">
               <SupplierDetailPage />
             </ProtectedRoute>
           }
@@ -58,7 +58,7 @@ function App() {
         <Route
           path="/compliance"
           element={
-            <ProtectedRoute allowedRole="compliance">
+            <ProtectedRoute allowedRole="admin">
               <CompliancePage />
             </ProtectedRoute>
           }

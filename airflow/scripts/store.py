@@ -58,6 +58,11 @@ def store_curated(data: dict) -> None:
     }
     _put_json(client, BUCKET_CURATED, audit_key, audit_entry)
     log.info("[store] Log d'audit écrit : %s", audit_key)
+
+    return {
+        "document_id": data.get("source_file", "").split("/")[-1].split(".")[0],
+        "curated_object_name": audit_key,
+    }
  
  
 # Helpers

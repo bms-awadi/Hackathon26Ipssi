@@ -13,7 +13,7 @@ def _env(name: str, default: str) -> str:
 MINIO_ENDPOINT = _env("MINIO_ENDPOINT", "http://minio:9000")
 MINIO_ACCESS_KEY = _env("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = _env("MINIO_SECRET_KEY", "minioadmin")
-MINIO_BUCKET_RAW = _env("MINIO_BUCKET_RAW", "raw-documents")
+MINIO_BUCKET_RAW = _env("MINIO_BUCKET_RAW", "raw")
 
 
 def _get_minio_client():

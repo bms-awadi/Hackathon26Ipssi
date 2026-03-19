@@ -23,7 +23,8 @@ const documentSchema = new mongoose.Schema(
 
     // last pipeline output (optional cache)
     contract: { type: Object },
-    anomalies: { type: [String], default: [] }
+    anomalies: { type: [String], default: [] },
+    ocrConfidence: { type: Number }
   },
   { timestamps: true }
 );

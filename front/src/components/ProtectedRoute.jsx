@@ -1,10 +1,11 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate } from "react-router-dom";
 
+// Backend roles: operator | supplier | admin
 export default function ProtectedRoute({ children, allowedRole }) {
-  const isAuthenticated = localStorage.getItem('isAuthenticated');
-  const userRole = localStorage.getItem('userRole');
+  const isAuthenticated = localStorage.getItem("isAuthenticated");
+  const userRole = localStorage.getItem("userRole");
 
-  if (isAuthenticated !== 'true') {
+  if (isAuthenticated !== "true") {
     return <Navigate to="/login" replace />;
   }
 

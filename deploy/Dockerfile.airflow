@@ -6,7 +6,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-fra \
     poppler-utils \
+    g++ \
+    gcc \
+    build-essential \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
 USER airflow
+
+RUN pip install --no-cache-dir \
+    minio \
+    pytesseract \
+    pillow \
+    pdf2image \
+    python-dotenv \
+    pdfplumber \
+    opencv-python-headless \
+    "spacy==3.7.4" \
+    easyocr
+
+RUN python -m spacy download fr_core_news_sm

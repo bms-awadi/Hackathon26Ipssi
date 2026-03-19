@@ -29,9 +29,9 @@ Login : `minio_admin` / `minio_password`
 
 | Bucket | Rôle | Producteur | Consommateur |
 |---|---|---|---|
-| `raw-documents` | Fichiers bruts uploadés (PDF, JPG, PNG) | Ryma (upload frontend) | Soufiane (OCR) |
-| `clean-texts` | JSON avec texte OCR extrait | Soufiane | Awadi (validation) |
-| `curated-data` | JSON structuré validé, prêt pour le frontend | Awadi | Ryma (auto-remplissage) |
+| `raw` | Fichiers bruts uploadés (PDF, JPG, PNG) | Ryma (upload frontend) | Soufiane (OCR) |
+| `clean` | JSON avec texte OCR extrait | Soufiane | Awadi (validation) |
+| `curated` | JSON structuré validé, prêt pour le frontend | Awadi | Ryma (auto-remplissage) |
 
 **Règle importante** : chaque service écrit uniquement dans sa zone de sortie et lit uniquement dans sa zone d'entrée. On ne remonte jamais en arrière.
 
@@ -42,16 +42,16 @@ Login : `minio_admin` / `minio_password`
 Tous les fichiers sont nommés avec le `document_id` (UUID généré à l'upload) :
 
 ```
-raw-documents/  {document_id}.pdf
-clean-texts/    {document_id}.json
-curated-data/   {document_id}.json
+raw/  {document_id}.pdf
+clean/    {document_id}.json
+curated/   {document_id}.json
 ```
 
 Exemple pour le document `3f8a2c1d-4b5e-...` :
 ```
-raw-documents/  3f8a2c1d-4b5e-....pdf
-clean-texts/    3f8a2c1d-4b5e-....json
-curated-data/   3f8a2c1d-4b5e-....json
+raw/  3f8a2c1d-4b5e-....pdf
+clean/    3f8a2c1d-4b5e-....json
+curated/   3f8a2c1d-4b5e-....json
 ```
 
 ---
@@ -109,8 +109,8 @@ list_objects(BUCKET_CURATED, prefix="2026-03-")
 Créer un fichier `.env` à la racine de `data-lake/` :
 
 ```env
-MINIO_ROOT_USER=minio_admin
-MINIO_ROOT_PASSWORD=minio_password
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=miniopassword
 MINIO_ENDPOINT=http://localhost:9000
 ```
 
