@@ -5,17 +5,30 @@ from typing import Optional, Tuple, List
 
 
 _SIRET_RE = re.compile(r"\b(\d{3}[\s.]?\d{3}[\s.]?\d{3}[\s.]?\d{5})\b")
-_TVA_RE = re.compile(r"\b(FR\d{11})\b", re.IGNORECASE)
+_TVA_RE = re.compile(r"\b(FR\s*\d{2}\s*\d{9})\b", re.IGNORECASE)
 
-# Montants avec separateurs simples; on normalise apres.
-_AMOUNT_RE = re.compile(r"\b(\d{1,3}(?:[ \u00A0]\d{3})+|\d{1,6})(?:[.,](\d{2,3}))?\b")
+# Montant avec point ou virgule decimale + unite optionnelle EUR/€
+_AMOUNT_RE = re.compile(
+    r"\b(\d+(?:[.,]\d{2})?)\s*(?:EUR|€)",
+    re.IGNORECASE,
+)
+
+# Labels pour montants HT et TTC par position dans le texte
+_HT_LABEL_RE = re.compile(r"total\s+ht", re.IGNORECASE)
+_TTC_LABEL_RE = re.compile(r"total\s+ttc", re.IGNORECASE)
+_TVA_LABEL_RE = re.compile(r"\btva\b", re.IGNORECASE)
 
 _DATE_FR_RE = re.compile(r"\b(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{2,4})\b")
 
+_DATE_EXPIRATION_RE = re.compile(
+    r"expir[^\d]*(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{2,4})",
+    re.IGNORECASE,
+)
+
 _MONTHS = {
     "janvier": 1,
-    "février": 2,
     "fevrier": 2,
+    "février": 2,
     "mars": 3,
     "avril": 4,
     "mai": 5,
@@ -35,24 +48,14 @@ def _clean_siret(raw: str) -> str:
     return re.sub(r"[\s.]", "", raw)
 
 
-def _normalize_amount(raw: str) -> Optional[float]:
-    if raw is None:
+def _parse_amount(s: str) -> Optional[float]:
+    if not s:
         return None
-    s = str(raw).strip()
-    # Enleve les espaces (incl. espace insécable)
-    s = s.replace("\u00A0", " ").replace(" ", "")
-
-    # Cas decimal avec virgule
+    s = s.strip().replace("\u00a0", "").replace(" ", "")
     if "," in s and "." in s:
-        # Probablement milliers avec '.' et decimal avec ','
-        s = s.replace(".", "")
-        s = s.replace(",", ".")
+        s = s.replace(".", "").replace(",", ".")
     elif "," in s:
         s = s.replace(",", ".")
-    else:
-        # garde '.' si present comme decimal
-        pass
-
     try:
         return float(s)
     except Exception:
@@ -61,14 +64,10 @@ def _normalize_amount(raw: str) -> Optional[float]:
 
 def _parse_dd_mm_yyyy(d: str, m: str, y: str) -> Optional[str]:
     try:
-        day = int(d)
-        month = int(m)
-        yy = int(y)
+        day, month, yy = int(d), int(m), int(y)
         if yy < 100:
-            # Heureux cas 2 chiffres (peu probable ici)
-            yy = 2000 + yy
-        dt = date(yy, month, day)
-        return dt.isoformat()
+            yy += 2000
+        return date(yy, month, day).isoformat()
     except Exception:
         return None
 
@@ -79,61 +78,43 @@ def _parse_date_candidates(text: str) -> List[str]:
         iso = _parse_dd_mm_yyyy(m.group(1), m.group(2), m.group(3))
         if iso:
             out.append(iso)
-    # Dates longues avec mois en toutes lettres
-    # Exemple: "15 mars 2025"
-    # On fait une extraction simple pour couvrir le cahier, pas un parse complet.
     month_pat = r"(\d{1,2})\s+(" + "|".join(_MONTHS.keys()) + r")\s+(\d{4})"
-    month_re = re.compile(month_pat, flags=re.IGNORECASE)
-    for m in month_re.finditer(text):
+    for m in re.finditer(month_pat, text, re.IGNORECASE):
         day = int(m.group(1))
-        mon_name = m.group(2).lower()
+        mon = _MONTHS.get(m.group(2).lower())
         yy = int(m.group(3))
-        mon = _MONTHS.get(mon_name)
         if mon:
             try:
                 out.append(date(yy, mon, day).isoformat())
             except Exception:
                 continue
-    # Dedup
     return list(dict.fromkeys(out))
 
 
 def _find_labelled_amounts(lines: List[str]) -> Tuple[Optional[float], Optional[float]]:
-    """
-    Cherche montants HT/TTC a partir de labels dans les lignes.
-    Strategie : pour chaque ligne qui contient un montant, on regarde si un label HT/TTC
-    est present, et on associe le dernier montant trouve.
-    """
     montant_ht = None
     montant_ttc = None
 
-    for line in lines:
-        lower = line.lower()
-        # Detection labels
-        is_ht = ("ht" in lower) or ("hors taxe" in lower) or ("hors-taxe" in lower)
-        is_ttc = ("ttc" in lower) or ("toutes taxes" in lower) or ("toutes taxes comprises" in lower)
+    for i, line in enumerate(lines):
+        amounts = [_parse_amount(m.group(1)) for m in _AMOUNT_RE.finditer(line)]
+        amounts = [a for a in amounts if a is not None and a > 0]
 
-        # Montant(s) de la ligne
-        amounts = []
-        for m in _AMOUNT_RE.finditer(line.replace(",", ".")):
-            # m.group(0) contient le nombre mais on normalise via groupe(1)+groupe(2)
-            whole = m.group(1)
-            dec = m.group(2)
-            if dec:
-                num = f"{whole}.{dec}"
-            else:
-                num = whole
-            val = _normalize_amount(num)
-            if val is not None:
-                amounts.append(val)
+        # Si pas de montant sur cette ligne, chercher sur la ligne suivante
+        if not amounts and i + 1 < len(lines):
+            next_line = lines[i + 1]
+            amounts = [
+                _parse_amount(m.group(1)) for m in _AMOUNT_RE.finditer(next_line)
+            ]
+            amounts = [a for a in amounts if a is not None and a > 0]
+
         if not amounts:
             continue
-        last_amt = amounts[-1]
+        last = amounts[-1]
 
-        if is_ttc:
-            montant_ttc = last_amt
-        elif is_ht:
-            montant_ht = last_amt
+        if _TTC_LABEL_RE.search(line):
+            montant_ttc = last
+        elif _HT_LABEL_RE.search(line):
+            montant_ht = last
 
     return montant_ht, montant_ttc
 
@@ -153,31 +134,18 @@ def extract_entities_spacy_regex(
     text: str,
     document_type: str = "facture_fournisseur",
 ) -> ExtractedEntities:
-    """
-    Extraction entites via segmentation spaCy (targeting) + regex par champ.
-    """
-    # spaCy : segmentation uniquement (les patterns restent regex, car le modele NER fr_core_news_lg
-    # n'est pas specialise "SIRET/TVA/montants").
     try:
         import spacy
 
         try:
             nlp = spacy.load("fr_core_news_lg")
         except Exception:
-            # fallback modele leger si pas present
             nlp = spacy.load("fr_core_news_sm")
     except Exception:
         nlp = None
 
     raw_text = text or ""
-
-    # Lignes : extraction montants
     lines = raw_text.splitlines()
-
-    # SIRET
-    # On utilise spaCy si dispo pour parcourir les phrases.
-    siret = ""
-    tva_intracommunautaire = ""
 
     candidates_siret = []
     candidates_tva = []
@@ -187,50 +155,32 @@ def extract_entities_spacy_regex(
         for sent in doc.sents:
             st = sent.text
             candidates_siret.extend([_clean_siret(x) for x in _SIRET_RE.findall(st)])
-            candidates_tva.extend([x.upper() for x in _TVA_RE.findall(st)])
+            candidates_tva.extend(
+                [x.replace(" ", "").upper() for x in _TVA_RE.findall(st)]
+            )
     else:
         candidates_siret = [_clean_siret(x) for x in _SIRET_RE.findall(raw_text)]
-        candidates_tva = [x.upper() for x in _TVA_RE.findall(raw_text)]
+        candidates_tva = [x.replace(" ", "").upper() for x in _TVA_RE.findall(raw_text)]
 
-    # Dedup en gardant l'ordre
     siret = list(dict.fromkeys(candidates_siret))[0] if candidates_siret else ""
     tva_intracommunautaire = (
         list(dict.fromkeys(candidates_tva))[0] if candidates_tva else ""
     )
 
-    # Montants
     montant_ht, montant_ttc = _find_labelled_amounts(lines)
 
-    # Dates
-    # Emission : premiere date detectee.
     all_dates = _parse_date_candidates(raw_text)
     date_emission = all_dates[0] if all_dates else None
-
-    # Expiration : cherche une date proche de mots-clés.
     date_expiration = None
-    if document_type.lower().startswith("facture"):
-        # Par defaut facture : pas forcement une expiration, on la laisse a None.
-        pass
 
-    kw = [
-        "expiration",
-        "expir",
-        "echeance",
-        "valable jusqu",
-        "jusqu",
-        "date d'expiration",
-        "date_expiration",
-    ]
-    lower = raw_text.lower()
-    if any(k in lower for k in kw):
-        # On prend la premiere date apres un keyword (heuristique).
-        # Pour rester simple/robuste, on scanne sur les lignes.
-        for line in lines:
-            if any(k in line.lower() for k in kw):
-                ds = _parse_date_candidates(line)
-                if ds:
-                    date_expiration = ds[0]
-                    break
+    # Expiration : cherche par label "expir"
+    m = _DATE_EXPIRATION_RE.search(raw_text)
+    if m:
+        date_expiration = _parse_dd_mm_yyyy(m.group(1), m.group(2), m.group(3))
+    elif document_type not in ("facture_fournisseur", "devis"):
+        # Fallback : deuxieme date trouvee pour attestations/kbis
+        if len(all_dates) > 1:
+            date_expiration = all_dates[1]
 
     return ExtractedEntities(
         siret=siret,
@@ -241,4 +191,3 @@ def extract_entities_spacy_regex(
         date_expiration=date_expiration,
         raw_text=raw_text,
     )
-
