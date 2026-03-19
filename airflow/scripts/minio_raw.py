@@ -1,6 +1,8 @@
 import logging
 import os
 from pathlib import Path
+from typing import Optional
+
 
 log = logging.getLogger(__name__)
 
@@ -28,8 +30,7 @@ def _get_minio_client():
         secure=secure,
     )
 
-
-def upload_raw(local_path: str, document_id: str | None = None) -> dict:
+def upload_raw(local_path: str, document_id: Optional[str] = None) -> dict:
     """
     Upload un fichier local vers MinIO bucket Raw.
 

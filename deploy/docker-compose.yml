@@ -20,7 +20,7 @@ x-airflow-common: &airflow-common
     MINIO_BUCKET_RAW: "${MINIO_BUCKET_RAW:-raw-documents}"
     MINIO_BUCKET_CLEAN_TEXTS: "${MINIO_BUCKET_CLEAN_TEXTS:-clean-texts}"
     MINIO_BUCKET_CURATED: "${MINIO_BUCKET_CURATED:-curated}"
-    _PIP_ADDITIONAL_REQUIREMENTS: "minio pytesseract pillow pdf2image python-dotenv pdfplumber opencv-python-headless spacy easyocr fr-core-news-lg"
+    #_PIP_ADDITIONAL_REQUIREMENTS: "minio pytesseract pillow pdf2image python-dotenv pdfplumber opencv-python-headless spacy easyocr fr-core-news-lg"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/scripts:/opt/airflow/scripts

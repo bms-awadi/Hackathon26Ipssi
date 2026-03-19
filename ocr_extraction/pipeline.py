@@ -137,12 +137,12 @@ def extract_from_local_file(
         raw_text=extracted.raw_text,
     )
 
-    return contract.to_dict() | {
-        "_ocr_meta": {
-            "engine_used": ocr_out.get("engine_used"),
-            "ocr_confidence_score": ocr_out.get("confidence_score"),
-        }
+    result = contract.to_dict()
+    result["_ocr_meta"] = {
+        "engine_used": ocr_out.get("engine_used"),
+        "ocr_confidence_score": ocr_out.get("confidence_score"),
     }
+    return result
 
 
 def extract_from_minio_to_clean(

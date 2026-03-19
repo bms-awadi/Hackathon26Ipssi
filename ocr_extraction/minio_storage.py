@@ -1,6 +1,8 @@
 import os
 import tempfile
+from pathlib import Path
 from typing import Optional
+
 
 
 def _env(name: str, default: str) -> str:
@@ -43,13 +45,14 @@ def download_from_minio(
     client = get_minio_client()
 
     if local_path is None:
-        fd, path = tempfile.mkstemp(prefix="minio_", suffix=".bin")
+        from pathlib import Path
+        ext = Path(object_key).suffix or ".bin"
+        fd, path = tempfile.mkstemp(prefix="minio_", suffix=ext)
         os.close(fd)
         local_path = path
 
     client.fget_object(bucket, object_key, local_path)
     return local_path
-
 
 def put_json_to_minio(
     payload: dict,
