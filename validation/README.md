@@ -1,8 +1,7 @@
-# Validation Dataset
+# Validation Service
 
-Le sservice de validation reçoit les données extraites par l'OCR et décide si un document est sain,
-suspect ou frauduleux. Il produit un score de risque entre 0 et 100 et une
-liste d'anomalies détectées.
+Le service de validation reçoit les entités extraites par l'OCR et décide si un document est sain,
+suspect ou frauduleux. Il produit un score de risque entre 0 et 100 et une liste d'anomalies détectées.
 
 ---
 
@@ -10,7 +9,7 @@ liste d'anomalies détectées.
 
 ```
 OCR Service  →  Validation Service  →  Backend Node.js
-             POST /validate              stockage MongoDB / data lake
+             POST /validate              stockage data lake
              { entités extraites }       { score, statut, anomalies }
 ```
 
@@ -42,12 +41,12 @@ validation/
 ├── rules.py         7 règles de validation (format, calcul, croisement)
 ├── scorer.py        Calcul du score de risque et du statut final
 ├── config.py        Poids des règles et seuils CLEAN / WARNING / FRAUD
-├── features.py      Extraction des features pour le modèle ML
-├── train.py         Entraînement du modèle AdaBoost sur le dataset
-├── evaluate.py      Mesure de la performance du modèle
+├── features.py      Extraction des 8 features pour le modèle ML
+├── train.py         Entraînement automatique via LazyClassifier (meilleur modèle sélectionné)
+├── evaluate.py      Mesure de la performance sur le dataset complet
 ├── predict.py       Prédiction ML sur un document
 ├── best_model.pkl   Modèle entraîné (généré par train.py)
-├── scaler.pkl       Normalisation des features (généré par train.py)
+├── scaler.pkl       Normalisation StandardScaler (généré par train.py)
 └── requirements.txt
 ```
 
@@ -57,39 +56,52 @@ validation/
 
 ### Niveau 1 — Règles déterministes
 
-Règles logiques appliquées sur les données extraites. Chaque règle retourne
-un message d'erreur ou None si tout est correct.
+Règles logiques appliquées sur les données extraites. Chaque règle retourne un message d'erreur ou `None` si tout est correct.
 
 | Règle | Ce qu'elle vérifie | Poids | Justification |
 |---|---|---|---|
-| FORMAT_SIRET | SIRET contient exactement 14 chiffres | 40 | Un SIRET mal formé ne peut pas être une faute de frappe. C'est soit un identifiant inventé, soit volontairement tronqué. Impact légal direct car le SIRET est obligatoire sur toute facture. |
-| LUHN_SIRET | SIRET valide selon l'algorithme de Luhn | 40 | L'algorithme de Luhn est une vérification mathématique. Un SIRET qui échoue est forcément construit avec de faux chiffres. Personne ne fait ça involontairement. Même poids que FORMAT_SIRET car même nature : intentionnel et objectif. |
-| ARITHMETIC_ERROR | HT + TVA = TTC (tolérance 0.01€) | 30 | Peut être une erreur de saisie ou une fraude. L'intention n'est pas certaine. Poids modéré : seul il ne bloque pas, il signale pour revue humaine. Deux anomalies de ce niveau ensemble passent en WARNING. |
-| TVA_INVALIDE | Clé TVA intracommunautaire correcte | 30 | La clé TVA se calcule mathématiquement à partir du SIREN. Une clé fausse peut venir d'une TVA copiée d'une autre entreprise ou d'une erreur de saisie. Même ambiguïté que l'arithmétique, même poids. |
-| ATTESTATION_EXPIRED | Date d'expiration non dépassée | 35 | Peut être un oubli administratif ou une tentative de faire passer un fournisseur non à jour URSSAF. Impact réglementaire : travailler avec un fournisseur non à jour engage la responsabilité de l'acheteur. Légèrement au dessus des erreurs de calcul. |
-| SIRET_MISMATCH | SIRET facture = SIRET attestation liée | 50 | Deux documents du même fournisseur avec deux SIRET différents. Difficile d'expliquer par une erreur involontaire. L'un des deux documents est nécessairement faux. Impact direct sur la validité juridique de la relation commerciale. |
-| DOUBLON_FACTURE | Pas de facture identique (même vendeur + même TTC) | 50 | Même vendeur, même montant, deux fichiers différents. Intention claire de double paiement. Impact financier direct et immédiat. Même poids que SIRET_MISMATCH car même niveau de certitude sur l'intention frauduleuse. |
+| `FORMAT_SIRET` | SIRET contient exactement 14 chiffres numériques | 40 | Un SIRET mal formé ne peut pas être une faute de frappe. C'est soit un identifiant inventé, soit volontairement tronqué. Impact légal direct : le SIRET est obligatoire sur toute facture. |
+| `LUHN_SIRET` | SIRET valide selon l'algorithme de Luhn | 40 | Vérification mathématique : un SIRET qui échoue est forcément construit avec de faux chiffres. Personne ne fait ça involontairement. N'est évalué que si `FORMAT_SIRET` passe. |
+| `ARITHMETIC_ERROR` | HT + TVA = TTC (tolérance 0,01 €) | 30 | Peut être une erreur de saisie ou une fraude. Seul, il ne bloque pas — il signale pour revue humaine. Deux anomalies de ce niveau ensemble suffisent à passer en WARNING. |
+| `TVA_INVALIDE` | Clé TVA intracommunautaire correcte `(12 + 3 × SIREN mod 97) mod 97` | 30 | La clé se calcule mathématiquement. Une clé fausse peut venir d'une TVA copiée d'une autre entreprise ou d'une erreur de saisie. Même ambiguïté que l'arithmétique, même poids. |
+| `ATTESTATION_EXPIRED` | Date d'expiration de l'attestation non dépassée | 35 | Peut être un oubli administratif ou une tentative de faire passer un fournisseur non à jour URSSAF. Travailler avec un fournisseur non à jour engage la responsabilité de l'acheteur. |
+| `SIRET_MISMATCH` | SIRET facture = SIRET de l'attestation liée | 50 | Deux documents du même fournisseur avec deux SIRET différents — l'un est forcément faux. Impact direct sur la validité juridique de la relation commerciale. |
+| `DOUBLON_FACTURE` | Pas de facture identique (même vendeur + même TTC) dans le dataset | 50 | Même vendeur, même montant, deux fichiers distincts : intention claire de double paiement. Impact financier direct et immédiat. |
 
-### Niveau 2 — Détection ML (AdaBoost)
+### Niveau 2 — Détection ML (sélection automatique via LazyClassifier)
 
-Modèle entraîné sur 1000 documents du dataset (500 légitimes, 500 falsifiés).
-Il détecte les anomalies que les règles ne couvrent pas en analysant les
-patterns des montants.
+Le modèle est sélectionné automatiquement à chaque exécution de `train.py` : tous les classifieurs scikit-learn sont évalués sur le dataset et le meilleur F1-score remporte la mise.
 
-- Précision globale : 87.9%
-- F1-score : 0.892
-- Rappel : 1.000 (aucun légitime classé comme frauduleux)
+**Résultats sur 2 000 factures PDF (1 000 légitimes / 1 000 falsifiées) :**
 
-Features utilisées :
-- total_ht, tva, total_ttc, taux_tva, ratio_tva, ratio_ttc
+| Modèle | Accuracy | F1 Score |
+|---|---|---|
+| **GaussianNB** *(sélectionné)* | **86,75 %** | **0.865** |
+| QuadraticDiscriminantAnalysis | 86,75 % | 0.865 |
+| AdaBoostClassifier | 86,00 % | 0.858 |
+| LGBMClassifier | 83,50 % | 0.833 |
+| RandomForestClassifier | 81,25 % | 0.812 |
 
-Le score ML va de 0 à 40 et s'additionne au score des règles déterministes.
+> GaussianNB est sélectionné automatiquement car il obtient le meilleur F1-score avec le temps d'inférence le plus bas (7 ms). Le modèle et le scaler sont sauvegardés dans `best_model.pkl` et `scaler.pkl`.
+
+**Features utilisées (8 au total) :**
+
+| # | Nom | Description |
+|---|---|---|
+| 0 | `total_ht` | Montant hors taxes |
+| 1 | `tva` | Montant TVA déclaré |
+| 2 | `total_ttc` | Montant toutes taxes comprises |
+| 3 | `taux_tva` | Taux TVA calculé |
+| 4 | `ratio_tva` | `tva / total_ht` |
+| 5 | `ratio_ttc` | `total_ttc / total_ht` |
+| 6 | `taux_normal` | 1 si taux TVA ≈ 20 %, 0 sinon |
+| 7 | `ecart_tva` | Écart absolu entre taux TVA et 20 % |
+
+Le score ML va de **0 à 40** et s'additionne au score des règles déterministes.
 
 ---
 
 ## Calcul du score de risque
-
-On additionne les poids des règles qui échouent, plafonné à 100.
 
 ```
 score = min(somme des poids des anomalies détectées, 100)
@@ -97,15 +109,32 @@ score = min(somme des poids des anomalies détectées, 100)
 
 | Score | Statut | Action |
 |---|---|---|
-| 0 - 29 | CLEAN | Document accepté automatiquement |
-| 30 - 69 | WARNING | Revue humaine recommandée |
-| 70 - 100 | FRAUD | Document bloqué, alerte créée |
+| 0 – 29 | `CLEAN` | Document accepté automatiquement |
+| 30 – 69 | `WARNING` | Revue humaine recommandée |
+| 70 – 100 | `FRAUD` | Document bloqué, alerte créée |
+
+---
+
+## Résultats des tests (10 cas de test)
+
+```
+CAS 1  — Document propre                → score=0   CLEAN    
+CAS 2  — Format SIRET incorrect         → score=80  FRAUD    ['FORMAT_SIRET', 'ML_ANOMALY']
+CAS 3  — SIRET invalide Luhn            → score=80  FRAUD    ['LUHN_SIRET', 'ML_ANOMALY']
+CAS 4  — Erreur arithmétique            → score=70  FRAUD    ['ARITHMETIC_ERROR', 'ML_ANOMALY']
+CAS 5  — TVA invalide                   → score=70  FRAUD    ['TVA_INVALIDE', 'ML_ANOMALY']
+CAS 6  — Attestation expirée            → score=35  WARNING  ['ATTESTATION_EXPIRED']
+CAS 7  — Attestation valide             → score=0   CLEAN    
+CAS 8  — SIRET mismatch inter-docs      → score=50  WARNING  ['SIRET_MISMATCH']
+CAS 9  — Doublon facture                → score=100 FRAUD    ['SIRET_MISMATCH', 'DOUBLON_FACTURE']
+CAS 10 — Cumul de fraudes               → score=100 FRAUD    ['LUHN_SIRET', 'ARITHMETIC_ERROR', 'TVA_INVALIDE', 'ML_ANOMALY']
+```
 
 ---
 
 ## Format des échanges
 
-### Requête
+### Requête POST /validate
 
 ```json
 {
@@ -113,9 +142,9 @@ score = min(somme des poids des anomalies détectées, 100)
   "doc_type":        "facture",
   "fichier":         "facture_legit_0001.pdf",
   "vendeur":         "Air France",
-  "siret":           "35291840035021",
-  "siren":           "352918400",
-  "tva":             "FR48352918400",
+  "siret":           "44829292000015",
+  "siren":           "448292920",
+  "tva":             "FR59448292920",
   "total_ht":        1920.0,
   "tva_montant":     384.0,
   "total_ttc":       2304.0,
@@ -123,7 +152,7 @@ score = min(somme des poids des anomalies détectées, 100)
 }
 ```
 
-### Réponse
+### Réponse — document propre
 
 ```json
 {
@@ -134,7 +163,7 @@ score = min(somme des poids des anomalies détectées, 100)
 }
 ```
 
-### Réponse avec anomalies
+### Réponse — fraude détectée
 
 ```json
 {
@@ -160,14 +189,13 @@ score = min(somme des poids des anomalies détectées, 100)
 
 ## Entraîner le modèle ML
 
-A faire une seule fois avant de lancer le serveur, ou après avoir régénéré
-le dataset.
+À faire une seule fois avant de lancer le serveur, ou après avoir régénéré le dataset.
 
 ```bash
 python train.py
 ```
 
-Pour mesurer la performance :
+Pour mesurer la performance sur le dataset complet :
 
 ```bash
 python evaluate.py
@@ -185,4 +213,14 @@ from features import extract_features
 doc = {'total_ht': 1500, 'tva': 300, 'total_ttc': 1800, 'taux_tva': 0.2}
 print(predict(extract_features(doc)))
 "
+```
+
+## Lancer les 10 cas de test
+
+```bash
+# 1. Démarrer le serveur
+uvicorn main:app --port 8001 --reload
+
+# 2. Dans un autre terminal
+python preprocess/test_validation.py
 ```
